@@ -329,9 +329,12 @@ body {
 #bouquet-view {
   z-index: 10;
   background:
-    radial-gradient(ellipse 65% 55% at 50% 48%, rgba(135, 42, 102, 0.22) 0%, rgba(35, 12, 54, 0.45) 45%, rgba(6, 2, 9, 0.92) 80%),
-    radial-gradient(circle at 50% 30%, rgba(255, 182, 193, 0.08) 0%, transparent 60%),
-    #050208;
+    radial-gradient(ellipse 95% 85% at 50% 50%, rgba(145, 45, 110, 0.45) 0%, rgba(55, 18, 78, 0.72) 48%, rgba(18, 7, 28, 0.95) 82%, #0e0517 100%),
+    radial-gradient(ellipse 70% 60% at 10% 40%, rgba(244, 114, 182, 0.28) 0%, rgba(168, 85, 247, 0.16) 45%, transparent 75%),
+    radial-gradient(ellipse 70% 60% at 90% 45%, rgba(56, 189, 248, 0.26) 0%, rgba(129, 140, 248, 0.16) 45%, transparent 75%),
+    radial-gradient(circle at 50% 15%, rgba(251, 146, 60, 0.22) 0%, transparent 60%),
+    radial-gradient(circle at 50% 90%, rgba(139, 92, 246, 0.25) 0%, transparent 60%),
+    #0e0517;
   opacity: 0;
   transition: opacity 1.15s cubic-bezier(0.22, 1, 0.36, 1);
 }

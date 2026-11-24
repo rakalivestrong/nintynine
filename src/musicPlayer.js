@@ -140,7 +140,7 @@ export class MusicPlayer {
         }
       } else {
         this.lyricsEl.className = 'music-lyrics pos-top-center';
-        this.lyricsEl.innerHTML = '“Second Best”';
+        this.lyricsEl.innerHTML = '“Bewitched”';
       }
     }
   }
