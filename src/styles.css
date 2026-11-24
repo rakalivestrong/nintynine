@@ -450,13 +450,14 @@ body {
   .music-lyrics {
     max-width: 86vw;
   }
+  .music-lyrics.pos-top-center,
   .music-lyrics.pos-left-top,
   .music-lyrics.pos-left-mid,
   .music-lyrics.pos-left-low,
   .music-lyrics.pos-right-top,
   .music-lyrics.pos-right-mid {
     top: auto;
-    bottom: max(78px, calc(env(safe-area-inset-bottom, 20px) + 60px));
+    bottom: max(72px, calc(env(safe-area-inset-bottom, 16px) + 56px));
     left: 50%;
     right: auto;
     transform: translateX(-50%);
@@ -679,7 +680,7 @@ body {
 #easter-egg-wrap {
   position: fixed;
   left: 50%;
-  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  bottom: max(16px, env(safe-area-inset-bottom, 16px));
   transform: translateX(-50%);
   z-index: 14;
   opacity: 0;
@@ -834,33 +835,150 @@ body {
 @media (max-width: 860px) {
   .dimension-scrim {
     background:
-      linear-gradient(180deg, rgba(8, 3, 13, 0) 24%, rgba(8, 3, 13, 0.62) 62%, rgba(8, 3, 13, 0.88) 100%);
+      linear-gradient(180deg, rgba(8, 3, 13, 0) 15%, rgba(8, 3, 13, 0.65) 52%, rgba(8, 3, 13, 0.94) 100%);
   }
 
   .dimension-ui {
     max-width: 100%;
     justify-content: flex-end;
-    padding: 24px 24px max(34px, env(safe-area-inset-bottom, 34px));
-    gap: 13px;
+    padding: max(20px, env(safe-area-inset-top, 20px)) 20px max(28px, env(safe-area-inset-bottom, 28px));
+    gap: 12px;
   }
 
   .hero-headline {
-    font-size: clamp(2.05rem, 8.6vw, 3rem);
+    font-size: clamp(1.85rem, 7.8vw, 2.75rem);
+    line-height: 1.12;
+  }
+
+  .hero-subtitle {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    max-width: 90%;
+  }
+
+  .hero-kicker {
+    font-size: 0.68rem;
+    letter-spacing: 0.22em;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Compact unified audio player on mobile */
+  .music-player-bar {
+    top: max(12px, env(safe-area-inset-top, 12px));
+    right: max(12px, env(safe-area-inset-right, 12px));
+    padding: 4px 10px;
+    gap: 6px;
+    min-height: 32px;
+  }
+
+  .music-track-title {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.68rem;
+  }
+
+  .music-slider {
+    width: 60px;
+  }
+
+  .music-vol-icon,
+  .music-volume-slider {
+    display: none;
+  }
+
+  #garden-controls {
+    top: max(12px, env(safe-area-inset-top, 12px));
+    left: max(12px, env(safe-area-inset-left, 12px));
+    gap: 6px;
+  }
+
+  .garden-ctrl-btn {
+    min-height: 32px;
+    padding: 4px 10px;
+    font-size: 0.72rem;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Extra-small screens: iPhone SE, Galaxy S series, compact devices */
+  .dimension-ui {
+    padding: 16px 16px max(24px, env(safe-area-inset-bottom, 24px));
+    gap: 10px;
+  }
+
+  .hero-headline {
+    font-size: clamp(1.65rem, 7.5vw, 2.15rem);
+  }
+
+  .portal-trigger {
+    padding: 12px 22px;
+    min-height: 44px;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+  }
+
+  .music-player-bar {
+    gap: 5px;
+    padding: 3px 8px;
+  }
+
+  .music-track-title {
+    display: none;
+  }
+
+  .music-slider {
+    width: 50px;
+  }
+
+  .music-time {
+    font-size: 0.62rem;
+  }
+
+  #signature {
+    font-size: clamp(1.85rem, 8vw, 2.3rem);
+    right: 14px;
+    bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  }
+
+  .music-lyrics {
+    font-size: clamp(1.05rem, 5vw, 1.35rem);
+    max-width: 92vw;
+  }
+
+  .easter-egg-btn {
+    font-size: 0.82rem;
+    padding: 5px 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  /* Ultra compact / fold outer screen */
+  .hero-headline {
+    font-size: 1.5rem;
+  }
+
+  .hero-subtitle {
+    font-size: 0.82rem;
+  }
+
+  .garden-ctrl-btn span:not(.ctrl-icon) {
+    display: none;
+  }
+
+  .garden-ctrl-btn {
+    padding: 4px 8px;
   }
 }
 
 @media (max-width: 680px) {
   #signature {
     top: auto;
-    bottom: max(20px, env(safe-area-inset-bottom, 20px));
-    right: 20px;
+    bottom: max(68px, calc(env(safe-area-inset-bottom, 16px) + 52px));
+    right: 18px;
     transform: rotate(-10deg);
-    font-size: clamp(2.15rem, 9.2vw, 2.75rem);
-  }
-
-  #easter-egg-wrap {
-    bottom: max(76px, calc(env(safe-area-inset-bottom, 20px) + 56px));
-    max-width: calc(100vw - 32px);
+    font-size: clamp(2rem, 8.5vw, 2.5rem);
   }
 
   .easter-egg-btn {

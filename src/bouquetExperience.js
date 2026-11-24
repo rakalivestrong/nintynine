@@ -883,7 +883,10 @@ export class BouquetExperience {
   resize() {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = window.innerWidth, h = window.innerHeight;
-    this.fontSize = clamp(Math.floor(Math.min(w / 100, h / 85)), 5, 11);
+    const isMobile = Math.min(w, h) < 600 || w < 768;
+    this.fontSize = isMobile
+      ? clamp(Math.floor(Math.min(w / 75, h / 70)), 6, 12)
+      : clamp(Math.floor(Math.min(w / 100, h / 85)), 5, 11);
     this.sctx.font = `bold ${this.fontSize}px Menlo, Consolas, "DejaVu Sans Mono", monospace`;
     this.cellW = this.sctx.measureText('M').width || this.fontSize * 0.6;
     this.cellH = this.fontSize;

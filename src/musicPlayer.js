@@ -112,13 +112,13 @@ export class MusicPlayer {
         // Update positioning class (removes previous pos-* classes)
         this.lyricsEl.className = `music-lyrics ${sideClass}`;
 
-        // Compute typing speed matched exactly to line duration in the song
+        // Fast responsive typewriter: finishes typing in ~40% of line duration so text is readable
+        const typingDuration = Math.min(1.4, Math.max(0.5, item.duration * 0.45));
         const elapsedSinceStart = Math.max(0, cur - item.time);
-        const remainingDuration = Math.max(0.6, item.duration - elapsedSinceStart);
         const charsLeft = fullText.length;
-        const intervalMs = Math.max(25, Math.min(130, Math.floor((remainingDuration * 1000) / charsLeft)));
+        const intervalMs = Math.max(16, Math.min(45, Math.floor((typingDuration * 1000) / charsLeft)));
 
-        let charIdx = Math.min(fullText.length, Math.floor((elapsedSinceStart / item.duration) * fullText.length));
+        let charIdx = Math.min(fullText.length, Math.floor((elapsedSinceStart / typingDuration) * fullText.length));
 
         const renderText = (len) => {
           this.lyricsEl.innerHTML = `“${fullText.slice(0, len)}<span class="type-cursor">|</span>”`;
@@ -140,7 +140,7 @@ export class MusicPlayer {
         }
       } else {
         this.lyricsEl.className = 'music-lyrics pos-top-center';
-        this.lyricsEl.innerHTML = '“Bewitched”';
+        this.lyricsEl.innerHTML = '';
       }
     }
   }

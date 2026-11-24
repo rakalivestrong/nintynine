@@ -952,7 +952,12 @@ export class FlowerDimensionScene {
     if (!this.camera) return;
 
     this.camera.aspect = aspect;
-    if (aspect < 0.78) {
+    if (aspect < 0.6) {
+      this.camera.fov = 52;
+      this.baseCamPos.set(0, -0.35, 9.4);
+      this.baseLookAt.set(0, -0.45, 0);
+      this.heroRestPos.set(0, 1.25, -0.2);
+    } else if (aspect < 0.78) {
       // Mobile portrait: place 3D flower elegantly in upper-center above editorial block
       this.camera.fov = 48;
       this.baseCamPos.set(0, -0.2, 8.7);
