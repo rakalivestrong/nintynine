@@ -1,0 +1,885 @@
+html_4species = '''<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D ASCII Luxury Bouquet - Blooming Animation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background-color: #000000;
+    color: #cccccc;
+    font-family: 'Consolas', 'Courier New', monospace;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    user-select: none;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+  }
+  canvas:active { cursor: grabbing; }
+  #code-overlay {
+    position: fixed;
+    bottom: 24px;
+    left: 20px;
+    font-size: 11px;
+    line-height: 1.45;
+    pointer-events: none;
+    opacity: 0.78;
+    text-shadow: 0 0 4px #000;
+    z-index: 10;
+  }
+  .kw { color: #c586c0; }
+  .fn { color: #dcdcaa; }
+  .var { color: #9cdcfe; }
+  .num { color: #b5cea8; }
+  .str { color: #ce9178; }
+  .op { color: #d4d4d4; }
+  #status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 20px;
+    background: #0a0a0c;
+    border-top: 1px solid #1e1e24;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 14px;
+    font-size: 10px;
+    color: #777;
+    z-index: 10;
+  }
+  #controls {
+    position: fixed;
+    top: 14px;
+    right: 16px;
+    display: flex;
+    gap: 8px;
+    z-index: 20;
+  }
+  button {
+    background: rgba(20, 20, 25, 0.85);
+    color: #ddd;
+    border: 1px solid #333;
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  button:hover {
+    background: #252530;
+    border-color: #ff4fa3;
+    color: #fff;
+  }
+  #hint {
+    position: fixed;
+    top: 16px;
+    left: 20px;
+    font-size: 11px;
+    color: #666;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="hint">Drag: Putar 3D &bull; Scroll: Zoom &bull; Klik: Tiupan Angin</div>
+
+<div id="controls">
+  <button id="btn-replay">Replay Mekar</button>
+  <button id="btn-reset">Reset Kamera</button>
+</div>
+
+<canvas id="asciiCanvas"></canvas>
+
+<div id="code-overlay">
+  <div><span class="kw">const</span> <span class="var">bouquet</span> <span class="op">=</span> <span class="fn">createLuxuryBouquet3D</span>([<span class="str">'Gerbera'</span>, <span class="str">'Peony'</span>, <span class="str">'StargazerLily'</span>, <span class="str">'Tulip'</span>]);</div>
+  <div><span class="kw">for</span> (<span class="kw">let</span> <span class="var">i</span> <span class="op">=</span> <span class="num">0</span>; <span class="var">i</span> <span class="op">&lt;</span> <span class="var">mesh</span>.<span class="var">vertices</span>.<span class="var">length</span>; <span class="var">i</span><span class="op">++</span>) {</div>
+  <div>&nbsp;&nbsp;<span class="kw">const</span> <span class="var">zDepth</span> <span class="op">=</span> <span class="fn">project3D</span>(<span class="var">v</span>[<span class="var">i</span>], <span class="var">rotX</span>, <span class="var">rotY</span>, <span class="var">camDist</span>);</div>
+  <div>&nbsp;&nbsp;<span class="kw">if</span> (<span class="var">zDepth</span> <span class="op">&gt;</span> <span class="var">zBuffer</span>[<span class="var">idx</span>]) <span class="fn">shadeAscii</span>(<span class="var">idx</span>, <span class="var">normal</span>, <span class="var">lightVec</span>);</div>
+  <div>}</div>
+</div>
+
+<div id="status-bar">
+  <div>ASCII-3D ENGINE // GERBERA &bull; PEONY &bull; STARGAZER LILY &bull; TULIP</div>
+  <div id="fps-counter">Ln 128, Col 24 | Spaces: 2 | UTF-8 | 60 FPS</div>
+</div>
+
+<script>
+const canvas = document.getElementById('asciiCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+let width, height, cols, rows;
+const cellW = 4;
+const cellH = 6;
+const chars = ".,-~:;=!*#$@";
+
+let zBuffer, charBuffer, colorBuffer;
+
+let rotY = 0.03;
+let rotX = 0.05;
+let targetRotY = 0.03;
+let targetRotX = 0.05;
+let zoom = 1.0;
+let targetZoom = 1.0;
+let isDragging = false;
+let lastMouseX = 0, lastMouseY = 0;
+
+let startTime = performance.now();
+let windGust = 0;
+
+const stars = [];
+for (let i = 0; i < 180; i++) {
+  stars.push({
+    x: Math.random(),
+    y: Math.random(),
+    phase: Math.random() * Math.PI * 2,
+    speed: 1.5 + Math.random() * 2.5,
+    char: Math.random() > 0.72 ? '+' : '.'
+  });
+}
+
+function resize() {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+  cols = Math.floor(width / cellW);
+  rows = Math.floor(height / cellH);
+  const size = cols * rows;
+  zBuffer = new Float32Array(size);
+  charBuffer = new Uint8Array(size);
+  colorBuffer = new Array(size);
+}
+window.addEventListener('resize', resize);
+resize();
+
+canvas.addEventListener('mousedown', e => {
+  isDragging = true;
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+window.addEventListener('mouseup', () => isDragging = false);
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - lastMouseX;
+  const dy = e.clientY - lastMouseY;
+  targetRotY += dx * 0.007;
+  targetRotX = Math.max(-0.8, Math.min(0.8, targetRotX + dy * 0.007));
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  targetZoom = Math.max(0.55, Math.min(2.2, targetZoom - e.deltaY * 0.001));
+}, { passive: false });
+canvas.addEventListener('click', () => { windGust = 1.0; });
+
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    lastMouseX = e.touches[0].clientX;
+    lastMouseY = e.touches[0].clientY;
+  }
+});
+window.addEventListener('touchend', () => isDragging = false);
+window.addEventListener('touchmove', e => {
+  if (!isDragging || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - lastMouseX;
+  const dy = e.touches[0].clientY - lastMouseY;
+  targetRotY += dx * 0.008;
+  targetRotX += dy * 0.008;
+  lastMouseX = e.touches[0].clientX;
+  lastMouseY = e.touches[0].clientY;
+});
+
+document.getElementById('btn-replay').addEventListener('click', () => { startTime = performance.now(); });
+document.getElementById('btn-reset').addEventListener('click', () => {
+  targetRotY = 0.03;
+  targetRotX = 0.05;
+  targetZoom = 1.0;
+});
+
+// Smooth ease-out cubic & back-out helper for organic blooming
+function easeOutCubic(x) {
+  return 1 - Math.pow(1 - Math.max(0, Math.min(1, x)), 3);
+}
+function easeOutBack(x) {
+  const t = Math.max(0, Math.min(1, x));
+  const c1 = 1.35;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+
+// Evaluate quadratic Bezier tip position so buds ride smoothly along growing stems!
+function evalBezier(p0, p1, p2, t) {
+  const mt = 1 - t;
+  return [
+    mt * mt * p0[0] + 2 * mt * t * p1[0] + t * t * p2[0],
+    mt * mt * p0[1] + 2 * mt * t * p1[1] + t * t * p2[1],
+    mt * mt * p0[2] + 2 * mt * t * p1[2] + t * t * p2[2]
+  ];
+}
+
+const lx = -0.32, ly = 0.52, lz = 0.79;
+let cosRX = 1, sinRX = 0, cosRY = 1, sinRY = 0, fov = 800;
+
+function plot3D(x, y, z, nx, ny, nz, r, g, b, swayOffset) {
+  const heightFactor = Math.max(0, (y + 9.0) / 22.0);
+  x += swayOffset * heightFactor * heightFactor;
+
+  const y1 = y * cosRX - z * sinRX;
+  const z1 = y * sinRX + z * cosRX;
+  const ny1 = ny * cosRX - nz * sinRX;
+  const nz1 = ny * sinRX + nz * cosRX;
+
+  const x2 = x * cosRY + z1 * sinRY;
+  const z2 = -x * sinRY + z1 * cosRY;
+  const nx2 = nx * cosRY + nz1 * sinRY;
+  const nz2 = -nx * sinRY + nz1 * cosRY;
+
+  const zDepth = 33.5 - z2;
+  if (zDepth <= 2.0) return;
+
+  const invZ = 1.0 / zDepth;
+  const px = Math.floor(cols * 0.5 + (x2 * fov * invZ) / cellW);
+  const py = Math.floor(rows * 0.52 - (y1 * fov * invZ) / cellH);
+
+  if (px < 0 || px >= cols || py < 0 || py >= rows) return;
+
+  const idx = py * cols + px;
+  if (invZ > zBuffer[idx]) {
+    zBuffer[idx] = invZ;
+    let diff = nx2 * lx + ny1 * ly + nz2 * lz;
+    if (diff < 0) diff = -diff * 0.30;
+    const lum = Math.min(1.0, Math.max(0.12, 0.24 + diff * 0.85));
+    const cIdx = Math.min(chars.length - 1, Math.floor(lum * (chars.length - 1)));
+    charBuffer[idx] = cIdx + 1;
+
+    const shade = 0.56 + lum * 0.66;
+    const fr = Math.min(255, Math.floor(r * shade));
+    const fg = Math.min(255, Math.floor(g * shade));
+    const fb = Math.min(255, Math.floor(b * shade));
+    colorBuffer[idx] = `rgb(${fr},${fg},${fb})`;
+  }
+}
+
+function makeRot(tx, ty, tz = 0) {
+  const cx = Math.cos(tx), sx = Math.sin(tx);
+  const cy = Math.cos(ty), sy = Math.sin(ty);
+  const cz = Math.cos(tz), sz = Math.sin(tz);
+  return function(lx, ly, lz) {
+    const x0 = lx * cz - ly * sz;
+    const y0 = lx * sz + ly * cz;
+    const y1 = y0 * cx - lz * sx;
+    const z1 = y0 * sx + lz * cx;
+    const x2 = x0 * cy + z1 * sy;
+    const z2 = -x0 * sy + z1 * cy;
+    return [x2, y1, z2];
+  };
+}
+
+function drawStem(p0, p1, p2, radius, progress, r, g, b, sway) {
+  if (progress <= 0) return;
+  const steps = 110;
+  const maxStep = Math.floor(steps * progress);
+  for (let i = 0; i <= maxStep; i++) {
+    const t = i / steps;
+    const mt = 1 - t;
+    const cx = mt * mt * p0[0] + 2 * mt * t * p1[0] + t * t * p2[0];
+    const cy = mt * mt * p0[1] + 2 * mt * t * p1[1] + t * t * p2[1];
+    const cz = mt * mt * p0[2] + 2 * mt * t * p1[2] + t * t * p2[2];
+    for (let a = 0; a < 10; a++) {
+      const ang = (a / 10) * Math.PI * 2;
+      const nx = Math.cos(ang), nz = Math.sin(ang);
+      plot3D(cx + nx * radius, cy, cz + nz * radius, nx, 0.2, nz, r, g, b, sway);
+    }
+  }
+}
+
+function drawLeaf(base, dir, length, maxW, progress, r, g, b, sway) {
+  if (progress <= 0) return;
+  const uSteps = 38, vSteps = 15;
+  const curLen = length * progress;
+  let rx = -dir[2], ry = 0, rz = dir[0];
+  const rLen = Math.hypot(rx, ry, rz) || 1;
+  rx /= rLen; ry /= rLen; rz /= rLen;
+  const nx = ry * dir[2] - rz * dir[1];
+  const ny = rz * dir[0] - rx * dir[2];
+  const nz = rx * dir[1] - ry * dir[0];
+
+  for (let i = 0; i <= uSteps; i++) {
+    const u = i / uSteps;
+    const dist = u * curLen;
+    const droop = -0.35 * u * u * curLen;
+    const w = Math.sin(u * Math.PI) * maxW * (1 - u * 0.22) * progress;
+    for (let j = -vSteps; j <= vSteps; j++) {
+      const v = j / vSteps;
+      const vein = -0.05 * (1 - Math.abs(v)) + 0.12 * (v * v);
+      const px = base[0] + dir[0] * dist + rx * (v * w) + nx * (droop + vein);
+      const py = base[1] + dir[1] * dist + ry * (v * w) + ny * (droop + vein);
+      const pz = base[2] + dir[2] * dist + rz * (v * w) + nz * (droop + vein);
+      const lnx = nx + rx * (v * 0.65), lny = ny + 0.35, lnz = nz + rz * (v * 0.65);
+      const edgeAO = 0.72 + 0.35 * (1 - v * v);
+      plot3D(px, py, pz, lnx, lny, lnz, r * edgeAO, g * edgeAO, b * edgeAO, sway);
+    }
+  }
+}
+
+function drawSolidago(base, dir, length, progress, sway) {
+  if (progress <= 0) return;
+  drawStem(
+    base,
+    [base[0] + dir[0] * length * 0.5, base[1] + dir[1] * length * 0.5 + 0.4, base[2] + dir[2] * length * 0.5],
+    [base[0] + dir[0] * length, base[1] + dir[1] * length, base[2] + dir[2] * length],
+    0.05, progress, 60, 145, 45, sway
+  );
+  const buds = 26;
+  for (let i = 4; i <= buds; i++) {
+    const t = (i / buds) * progress;
+    const bx = base[0] + dir[0] * length * t + Math.sin(i * 2.4) * 0.40;
+    const by = base[1] + dir[1] * length * t + Math.cos(i * 1.9) * 0.40;
+    const bz = base[2] + dir[2] * length * t + Math.sin(i * 3.1) * 0.40;
+    for (let k = 0; k < 7; k++) {
+      const a = k * 0.89;
+      const ox = Math.cos(a) * 0.15, oy = Math.sin(a) * 0.15, oz = Math.sin(a * 2) * 0.15;
+      plot3D(bx + ox, by + oy, bz + oz, ox * 4, oy * 4 + 0.5, oz * 4 + 0.5, 190, 225, 55, sway);
+    }
+  }
+}
+
+// 1. GERBERA DAISY (Blooms from tight upright bud into wide sculpted disk)
+function drawGerbera(center, tiltX, tiltY, radius, bloomProg, palette, sway) {
+  if (bloomProg <= 0.01) return;
+  const open = easeOutCubic(bloomProg);
+  const scale = 0.28 + 0.72 * easeOutBack(bloomProg);
+  const rot = makeRot(tiltX, tiltY);
+  const discR = radius * 0.25 * scale;
+
+  for (let r = 0; r <= 16; r++) {
+    const rf = r / 16;
+    const rr = rf * discR;
+    const count = Math.max(1, Math.floor(r * 7));
+    for (let a = 0; a < count; a++) {
+      const ang = (a / count) * Math.PI * 2 + r * 0.25;
+      const lx = Math.cos(ang) * rr, ly = Math.sin(ang) * rr;
+      const bump = 0.04 * Math.sin(r * 2.5) * Math.cos(a * 2.0);
+      const lz = 0.22 * scale + Math.sqrt(Math.max(0, discR * discR - rr * rr)) * 0.52 + bump;
+      const [dx, dy, dz] = rot(lx, ly, lz);
+      const [wnx, wny, wnz] = rot(Math.cos(ang) * rf * 0.7, Math.sin(ang) * rf * 0.7, 0.8);
+      if (rf < 0.68) {
+        const stipple = 0.65 + 0.55 * ((r + a) % 2);
+        plot3D(center[0] + dx, center[1] + dy, center[2] + dz, wnx, wny, wnz, 34 * stipple, 16 * stipple, 14 * stipple, sway);
+      } else if (rf < 0.86) {
+        plot3D(center[0] + dx, center[1] + dy, center[2] + dz + 0.04, wnx, wny, 1.0, palette.ring[0], palette.ring[1], palette.ring[2], sway);
+      } else {
+        plot3D(center[0] + dx, center[1] + dy, center[2] + dz, wnx, wny, 0.9, palette.inner[0], palette.inner[1], palette.inner[2], sway);
+      }
+    }
+  }
+
+  const layers = [
+    { count: 22, len: radius * 0.68, width: 0.25, zOff: 0.14, openAng: 0.30, col: palette.inner },
+    { count: 26, len: radius * 0.90, width: 0.28, zOff: 0.05, openAng: 0.12, col: palette.mid },
+    { count: 28, len: radius * 1.06, width: 0.31, zOff: -0.04, openAng: -0.04, col: palette.outer },
+  ];
+
+  layers.forEach((layer, lIdx) => {
+    // Inner layers unfurl slightly after outer layers
+    const layerOpen = easeOutCubic((bloomProg - (2 - lIdx) * 0.08) / 0.84);
+    const cupPitch = (1 - layerOpen) * 1.35 + layer.openAng;
+    for (let p = 0; p < layer.count; p++) {
+      const baseAng = (p / layer.count) * Math.PI * 2 + lIdx * 0.14;
+      const cosA = Math.cos(baseAng), sinA = Math.sin(baseAng);
+      const pLen = layer.len * scale * (0.95 + 0.08 * Math.sin(p * 3.7 + lIdx));
+      for (let u = 1; u <= 24; u++) {
+        const uf = u / 24;
+        const radialDist = discR * 0.76 + uf * pLen * Math.cos(cupPitch * 0.55);
+        const wProf = Math.sin(Math.pow(uf, 0.68) * Math.PI) * layer.width * scale;
+        const archZ = layer.zOff * scale + Math.sin(uf * Math.PI * 0.82) * 0.24 * scale + (uf * pLen) * Math.sin(cupPitch) * 0.75;
+        const slopeU = Math.cos(uf * Math.PI * 0.82) * 0.35;
+        for (let v = -8; v <= 8; v++) {
+          const vf = v / 8;
+          const lat = vf * wProf;
+          const fluteZ = (1 - vf * vf) * 0.09 - Math.abs(vf) * 0.04;
+          const lx = cosA * radialDist - sinA * lat;
+          const ly = sinA * radialDist + cosA * lat;
+          const lz = archZ + fluteZ;
+          const [dx, dy, dz] = rot(lx, ly, lz);
+          const [wnx, wny, wnz] = rot(cosA * slopeU - sinA * (vf * 0.8), sinA * slopeU + cosA * (vf * 0.8), 0.82);
+          const vf2 = vf * vf;
+          const edgeShadow = 1.0 - 0.68 * (vf2 * vf2 * vf2);
+          const baseShadow = 0.72 + 0.38 * uf;
+          const ribHighlight = Math.abs(vf) < 0.35 ? 1.15 : 1.0;
+          const mult = edgeShadow * baseShadow * ribHighlight;
+          plot3D(center[0] + dx, center[1] + dy, center[2] + dz, wnx, wny, wnz, layer.col[0] * mult, layer.col[1] * mult, layer.col[2] * mult, sway);
+        }
+      }
+    }
+  });
+}
+
+// 2. PEONY ROSE (Unfurls outer rose-pink ruffled petals first, revealing creamy peach cup & golden stamens!)
+function drawPeony(center, tiltX, tiltY, radius, isBud, bloomProg, sway) {
+  if (bloomProg <= 0.01) return;
+  const open = easeOutCubic(bloomProg);
+  const scale = 0.25 + 0.75 * easeOutBack(bloomProg);
+  const rot = makeRot(tiltX, tiltY);
+
+  // Golden stamens appear as the inner cup opens
+  if (open > 0.35) {
+    const stProg = Math.min(1, (open - 0.35) / 0.65);
+    const stamenCount = isBud ? 24 : 36;
+    for (let s = 0; s < stamenCount; s++) {
+      const ang = (s / stamenCount) * Math.PI * 2 + (s % 3) * 0.3;
+      const sr = radius * scale * (0.14 + 0.15 * ((s * 7) % 10) / 10);
+      const sh = radius * scale * (0.28 + 0.18 * Math.sin(s * 2.1)) * stProg;
+      for (let h = 0; h < 7; h++) {
+        const hf = h / 6;
+        const lx = Math.cos(ang) * sr * (0.6 + 0.5 * hf);
+        const ly = Math.sin(ang) * sr * (0.6 + 0.5 * hf);
+        const lz = -0.15 * scale + hf * sh;
+        const [dx, dy, dz] = rot(lx, ly, lz);
+        const [wnx, wny, wnz] = rot(Math.cos(ang), Math.sin(ang), 0.6);
+        if (h >= 5) {
+          plot3D(center[0] + dx, center[1] + dy, center[2] + dz, wnx, wny, wnz, 255, 205, 80, sway);
+        } else {
+          plot3D(center[0] + dx, center[1] + dy, center[2] + dz, wnx, wny, wnz, 165, 120, 55, sway);
+        }
+      }
+    }
+  }
+
+  const tiers = isBud ? [
+    { count: 6, pLen: radius * 0.68, pWidth: 0.60, pitch: 1.05, cBase: [255, 235, 212], cTip: [248, 150, 168] },
+    { count: 8, pLen: radius * 0.84, pWidth: 0.70, pitch: 0.82, cBase: [255, 205, 195], cTip: [225, 95, 128] },
+  ] : [
+    { count: 7, pLen: radius * 0.60, pWidth: 0.54, pitch: 0.92, cBase: [255, 232, 208], cTip: [250, 155, 172] },
+    { count: 9, pLen: radius * 0.78, pWidth: 0.66, pitch: 0.68, cBase: [255, 212, 198], cTip: [242, 122, 150] },
+    { count: 11, pLen: radius * 0.94, pWidth: 0.76, pitch: 0.42, cBase: [250, 172, 185], cTip: [222, 88, 125] },
+    { count: 12, pLen: radius * 1.06, pWidth: 0.82, pitch: 0.16, cBase: [232, 120, 148], cTip: [195, 65, 102] },
+  ];
+
+  tiers.forEach((tier, tIdx) => {
+    // Outer tiers bloom first, inner tiers unfurl gradually
+    const tierOpen = easeOutCubic((bloomProg - (tiers.length - 1 - tIdx) * 0.08) / 0.78);
+    const dynPitch = tier.pitch + (1 - tierOpen) * 1.05;
+    const spread = 0.45 + 0.55 * tierOpen;
+
+    for (let p = 0; p < tier.count; p++) {
+      const baseAng = (p / tier.count) * Math.PI * 2 + tIdx * 0.45 + Math.sin(p * 2.3) * 0.12;
+      const cosA = Math.cos(baseAng), sinA = Math.sin(baseAng);
+      for (let u = 1; u <= 25; u++) {
+        const uf = u / 25;
+        const rCurve = (radius * (0.14 + 0.06 * tIdx) + Math.sin(uf * Math.PI * 0.68) * tier.pLen * spread) * scale;
+        const zCurve = (-0.22 + Math.pow(uf, 1.35) * tier.pLen * (0.55 + dynPitch * 0.65)) * scale;
+        const wProf = Math.sin(Math.pow(uf, 0.55) * Math.PI) * tier.pWidth * scale * (1.0 + 0.12 * Math.sin(uf * 14 + p));
+
+        for (let v = -12; v <= 12; v++) {
+          const vf = v / 12;
+          const cupInward = -(1 - vf * vf) * 0.24 * Math.sin(uf * Math.PI) * scale;
+          const ruffleZ = Math.pow(uf, 2.2) * 0.15 * Math.sin(vf * 9 + p * 1.7 + tIdx) * scale * tierOpen;
+          const ruffleR = Math.pow(uf, 1.8) * 0.09 * Math.cos(vf * 7 - p * 2.1) * scale * tierOpen;
+
+          const rad = rCurve + cupInward + ruffleR;
+          const lat = vf * wProf;
+          const lx = cosA * rad - sinA * lat;
+          const ly = sinA * rad + cosA * lat;
+          const lz = zCurve + ruffleZ;
+
+          const [dx, dy, dz] = rot(lx, ly, lz);
+          const nxL = cosA * (0.75 - uf * 0.3) - sinA * (vf * 0.65 + 0.35 * Math.cos(vf * 9 + p));
+          const nyL = sinA * (0.75 - uf * 0.3) + cosA * (vf * 0.65 + 0.35 * Math.cos(vf * 9 + p));
+          const [wnx, wny, wnz] = rot(nxL, nyL, 0.45 + uf * 0.45);
+
+          const mix = Math.pow(uf, 1.4);
+          const rr = tier.cBase[0] * (1 - mix) + tier.cTip[0] * mix;
+          const gg = tier.cBase[1] * (1 - mix) + tier.cTip[1] * mix;
+          const bb = tier.cBase[2] * (1 - mix) + tier.cTip[2] * mix;
+
+          const edgeAO = 1.0 - 0.58 * (vf * vf * vf * vf);
+          const foldAO = 0.74 + 0.35 * uf;
+          const mult = edgeAO * foldAO;
+          plot3D(center[0] + dx, center[1] + dy, center[2] + dz, wnx, wny, wnz, rr * mult, gg * mult, bb * mult, sway);
+        }
+      }
+    }
+  });
+}
+
+// 3. STARGAZER LILY (Opens from closed striped trumpet bud into 6 recurved star petals + protruding red anthers!)
+function drawLily(center, tiltX, tiltY, tiltZ, radius, bloomProg, sway) {
+  if (bloomProg <= 0.01) return;
+  const open = easeOutCubic(bloomProg);
+  const scale = 0.25 + 0.75 * easeOutBack(bloomProg);
+  const rot = makeRot(tiltX, tiltY, tiltZ);
+
+  for (let p = 0; p < 6; p++) {
+    const isInner = (p % 2 === 0);
+    const baseAng = (p / 6) * Math.PI * 2 + 0.25;
+    const cosA = Math.cos(baseAng), sinA = Math.sin(baseAng);
+    const pLen = radius * (isInner ? 1.05 : 0.98) * scale;
+    const pW = radius * (isInner ? 0.38 : 0.32) * scale;
+    const zOff = (isInner ? 0.08 : -0.04) * scale;
+
+    for (let u = 1; u <= 30; u++) {
+      const uf = u / 30;
+      // When closed (open=0), petals form a tight upward trumpet; as open->1, tips recurve backward!
+      const flare = 0.28 + 0.72 * open;
+      const radial = 0.10 * scale + uf * pLen * flare * (1 - 0.12 * Math.pow(uf, 3) * open);
+      const closedLift = (1 - open) * uf * pLen * 0.95;
+      const trumpetZ = zOff + closedLift + Math.sin(uf * Math.PI * 0.72) * (radius * 0.42 * scale * open) - Math.pow(uf, 3.2) * (radius * 0.38 * scale * open);
+      const wProf = Math.sin(Math.pow(uf, 0.62) * Math.PI) * pW * (1 + 0.06 * Math.sin(uf * 16));
+
+      for (let v = -12; v <= 12; v++) {
+        const vf = v / 12;
+        const avf = Math.abs(vf);
+        const lat = vf * wProf;
+        const keelZ = ((1 - avf) * 0.08 - (vf * vf) * 0.11 + Math.pow(uf, 1.5) * 0.04 * Math.sin(vf * 10)) * scale;
+        const lx = cosA * radial - sinA * lat;
+        const ly = sinA * radial + cosA * lat;
+        const lz = trumpetZ + keelZ;
+        const [dx, dy, dz] = rot(lx, ly, lz);
+
+        const slopeU = Math.cos(uf * Math.PI * 0.72) * 0.7 - 1.1 * Math.pow(uf, 2.2);
+        const [wnx, wny, wnz] = rot(cosA * slopeU - sinA * (vf * 0.85), sinA * slopeU + cosA * (vf * 0.85), 0.75);
+
+        let rr, gg, bb;
+        if (uf < 0.22 && avf < 0.55) {
+          const tMix = uf / 0.22;
+          rr = 195 * (1 - tMix) + 245 * tMix;
+          gg = 235 * (1 - tMix) + 75 * tMix;
+          bb = 90 * (1 - tMix) + 145 * tMix;
+        } else if (avf > 0.70) {
+          const wBlend = Math.min(1, (avf - 0.70) / 0.18);
+          rr = 248 * (1 - wBlend) + 255 * wBlend;
+          gg = 120 * (1 - wBlend) + 252 * wBlend;
+          bb = 175 * (1 - wBlend) + 255 * wBlend;
+        } else if (avf < 0.15) {
+          rr = 225; gg = 25; bb = 88;
+        } else {
+          const spotWave = Math.sin(uf * 42 + p * 1.7) * Math.cos(vf * 26 - p * 2.3);
+          if (uf < 0.74 && spotWave > 0.48) {
+            rr = 145; gg = 8; bb = 42;
+          } else {
+            rr = 248; gg = 78; bb = 145;
+          }
+        }
+
+        const edgeAO = 1.0 - 0.35 * Math.pow(vf, 6);
+        plot3D(center[0] + dx, center[1] + dy, center[2] + dz, wnx, wny, wnz, rr * edgeAO, gg * edgeAO, bb * edgeAO, sway);
+      }
+    }
+  }
+
+  // 6 Protruding Curved Stamens + Dark Mahogany-Red Anthers emerge as lily opens
+  if (open > 0.30) {
+    const stOpen = Math.min(1, (open - 0.30) / 0.70);
+    for (let s = 0; s < 6; s++) {
+      const ang = (s / 6) * Math.PI * 2 + 0.75;
+      const cosS = Math.cos(ang), sinS = Math.sin(ang);
+      const filLen = radius * 0.74 * scale * stOpen;
+      for (let h = 0; h < 16; h++) {
+        const hf = h / 15;
+        const sr = (0.08 + Math.sin(hf * Math.PI * 0.65) * (radius * 0.32) * stOpen) * scale;
+        const sz = hf * filLen;
+        const [dx, dy, dz] = rot(cosS * sr, sinS * sr, sz);
+        const [wnx, wny, wnz] = rot(cosS, sinS, 0.5);
+        for (let th = -1; th <= 1; th++) {
+          plot3D(center[0] + dx + th * 0.025, center[1] + dy, center[2] + dz, wnx, wny, wnz, 215, 235, 175, sway);
+        }
+      }
+      const tipR = (0.08 + Math.sin(Math.PI * 0.65) * (radius * 0.32) * stOpen) * scale;
+      for (let aStep = -5; aStep <= 5; aStep++) {
+        const af = aStep / 5;
+        const ax = cosS * (tipR + af * 0.14 * scale);
+        const ay = sinS * (tipR + af * 0.14 * scale);
+        const az = filLen + af * 0.18 * scale;
+        for (let radA = 0; radA < 5; radA++) {
+          const ra = (radA / 5) * Math.PI * 2;
+          const [dx, dy, dz] = rot(ax + Math.cos(ra) * 0.045 * scale, ay + Math.sin(ra) * 0.045 * scale, az);
+          const [wnx, wny, wnz] = rot(Math.cos(ra), Math.sin(ra), 0.4);
+          plot3D(center[0] + dx, center[1] + dy, center[2] + dz, wnx, wny, wnz, 165, 24, 20, sway);
+        }
+      }
+    }
+  }
+}
+
+// 4. PINK TULIP (Swells from tight green-blushed bud into plump glowing rose-pink goblet!)
+function drawTulip(center, tiltX, tiltY, tiltZ, radius, bloomProg, sway) {
+  if (bloomProg <= 0.01) return;
+  const open = easeOutCubic(bloomProg);
+  const scale = 0.28 + 0.72 * easeOutBack(bloomProg);
+  const rot = makeRot(tiltX, tiltY, tiltZ);
+
+  for (let p = 0; p < 6; p++) {
+    const isOuter = (p % 2 === 0);
+    const baseAng = (p / 6) * Math.PI * 2 + (isOuter ? 0 : 0.05);
+    const cosA = Math.cos(baseAng), sinA = Math.sin(baseAng);
+    const rOffset = (isOuter ? 0.08 : 0) * scale;
+    const pHeight = radius * (isOuter ? 1.35 : 1.42) * scale;
+    const pWidth = radius * (isOuter ? 0.68 : 0.62) * scale * (0.65 + 0.35 * open);
+
+    for (let u = 1; u <= 28; u++) {
+      const uf = u / 27;
+      const swell = 0.35 + 0.65 * open;
+      const gobletR = rOffset + radius * scale * (0.12 + 0.56 * swell * Math.sin(uf * Math.PI * 0.78));
+      const gobletZ = uf * pHeight;
+      const wProf = Math.sin(Math.pow(uf, 0.58) * Math.PI) * pWidth;
+
+      for (let v = -12; v <= 12; v++) {
+        const vf = v / 12;
+        const lat = vf * wProf;
+        const cupWrap = -(vf * vf) * (radius * 0.25 * scale) * Math.sin(uf * Math.PI);
+        const rad = gobletR + cupWrap;
+        const [dx, dy, dz] = rot(cosA * rad - sinA * lat, sinA * rad + cosA * lat, gobletZ);
+
+        const nxL = cosA * Math.cos(uf * Math.PI * 0.65) - sinA * (vf * 0.85);
+        const nyL = sinA * Math.cos(uf * Math.PI * 0.65) + cosA * (vf * 0.85);
+        const [wnx, wny, wnz] = rot(nxL, nyL, 0.25 - 0.35 * (uf - 0.45));
+
+        const vein = 0.94 + 0.08 * Math.cos(vf * 16);
+        const rimGlow = Math.pow(Math.max(0, (uf - 0.58) / 0.42), 1.4) * open;
+        const edgeBlush = Math.max(0, (Math.abs(vf) - 0.62) / 0.38) * 0.50 * open;
+        const blush = Math.min(1, rimGlow * 0.70 + edgeBlush);
+
+        // Transitions from fresh green-tinted bud base to luminous rose-pink goblet
+        const greenTint = (1 - open) * (1 - uf) * 0.55;
+        const rr = ((242 * (1 - blush) + 255 * blush) * (1 - greenTint) + 95 * greenTint) * vein;
+        const gg = ((48 * (1 - blush) + 195 * blush) * (1 - greenTint) + 175 * greenTint) * vein;
+        const bb = ((128 * (1 - blush) + 225 * blush) * (1 - greenTint) + 75 * greenTint) * vein;
+
+        const edgeAO = 1.0 - 0.54 * Math.pow(vf, 6);
+        const baseAO = 0.76 + 0.30 * uf;
+        const mult = edgeAO * baseAO;
+        plot3D(center[0] + dx, center[1] + dy, center[2] + dz, wnx, wny, wnz, rr * mult, gg * mult, bb * mult, sway);
+      }
+    }
+  }
+}
+
+function drawVaseAndRibbon(progress, sway) {
+  if (progress <= 0) return;
+  const vaseTop = -2.6, vaseBottom = -8.8;
+  const hSteps = 65, aSteps = 44;
+  for (let i = 0; i <= hSteps; i++) {
+    const t = i / hSteps;
+    if (t > progress) break;
+    const y = vaseBottom + t * (vaseTop - vaseBottom);
+    const r = 1.75 - Math.sin(t * Math.PI * 0.75) * 0.65;
+    for (let a = 0; a < aSteps; a++) {
+      const ang = (a / aSteps) * Math.PI * 2;
+      const nx = Math.cos(ang), nz = Math.sin(ang);
+      if (t < 0.42) {
+        const pebble = 0.78 + 0.35 * Math.sin(a * 3.0 + i * 1.7);
+        plot3D(nx * r * 0.88, y, nz * r * 0.88, nx, 0.15, nz, 255 * pebble, 85 * pebble, 170 * pebble, sway * 0.15);
+      } else if (a % 2 === 0) {
+        plot3D(nx * r, y, nz * r, nx, 0.1, nz, 140, 190, 215, sway * 0.15);
+      }
+    }
+  }
+
+  const knotY = -2.9;
+  for (const side of [-1, 1]) {
+    for (let u = 0; u <= 30; u++) {
+      const t = (u / 30) * Math.PI;
+      const rx = side * Math.sin(t) * 1.85;
+      const ry = knotY + Math.sin(t * 2) * 0.54;
+      const rz = 1.22 + Math.sin(t) * 0.38;
+      for (let w = -4; w <= 4; w++) {
+        plot3D(rx, ry + w * 0.08, rz, 0, 0.25, 1, 250, 110, 195, sway * 0.2);
+      }
+    }
+  }
+
+  const tails = [
+    { xOff: -0.82, dirX: -0.18, phase: 0.4 },
+    { xOff: 0.82, dirX: 0.20, phase: 2.1 }
+  ];
+  tails.forEach(tail => {
+    const lenSteps = 75, widthSteps = 13;
+    for (let i = 0; i <= lenSteps; i++) {
+      const t = i / lenSteps;
+      if (t > progress * 1.1) break;
+      const y = knotY - t * 6.4;
+      const waveX = tail.xOff + tail.dirX * t * 6.2 + Math.sin(t * 5.0 + tail.phase) * 0.26;
+      const waveZ = 1.42 + Math.sin(t * 3.5) * 0.30 + t * 0.38;
+      for (let w = -widthSteps; w <= widthSteps; w++) {
+        const wf = w / widthSteps;
+        const px = waveX + wf * 0.64;
+        const pz = waveZ - Math.abs(wf) * 0.08;
+        const pat1 = Math.sin(t * 18 + wf * 4 + tail.phase);
+        const pat2 = Math.cos(t * 13 - wf * 5);
+        let rr, gg, bb;
+        if (pat1 > 0.35) { rr = 255; gg = 70; bb = 160; }
+        else if (pat2 > 0.48) { rr = 255; gg = 220; bb = 55; }
+        else if (Math.abs(wf) > 0.78) { rr = 115; gg = 205; bb = 255; }
+        else { rr = 240; gg = 235; bb = 255; }
+        plot3D(px, y, pz, wf * 0.3, 0.1, 1.0, rr, gg, bb, sway * 0.25);
+      }
+    }
+  });
+}
+
+const PALETTE_PINK = { outer: [255, 50, 155], mid: [255, 100, 185], inner: [255, 150, 210], ring: [255, 210, 150] };
+const PALETTE_ORANGE = { outer: [255, 105, 15], mid: [255, 140, 35], inner: [255, 175, 75], ring: [255, 225, 90] };
+const PALETTE_YELLOW = { outer: [255, 220, 15], mid: [255, 240, 50], inner: [255, 252, 115], ring: [245, 190, 40] };
+
+// Define all 10 stems + staggered bloom delays so the bouquet opens in a natural botanical wave!
+const STEMS_DATA = [
+  // 0, 1, 2: Gerberas
+  { p0: [0.0, -2.9, 0.0], p1: [0.5, 2.1, -0.3], p2: [1.1, 7.1, -0.1], col: [55, 145, 50], delay: 0.15 },
+  { p0: [-0.1, -2.9, 0.1], p1: [-2.3, 1.4, 0.2], p2: [-4.6, 5.6, 0.4], col: [60, 155, 50], delay: 0.25 },
+  { p0: [0.0, -2.9, 0.2], p1: [-0.1, -0.8, 1.1], p2: [-0.2, 0.9, 1.8], col: [50, 135, 45], delay: 0.05 },
+  // 3, 4: Peonies
+  { p0: [0.2, -2.9, 0.2], p1: [2.1, 0.1, 0.8], p2: [4.1, 3.0, 1.3], col: [52, 132, 46], delay: 0.10 },
+  { p0: [0.3, -2.9, 0.0], p1: [2.9, 1.6, 0.3], p2: [5.5, 5.7, 0.6], col: [58, 142, 48], delay: 0.32 },
+  // 5, 6: Stargazer Lilies
+  { p0: [-0.2, -2.9, 0.3], p1: [-2.2, -0.4, 1.0], p2: [-4.2, 1.7, 1.6], col: [48, 128, 44], delay: 0.12 },
+  { p0: [-0.1, -2.9, -0.1], p1: [-1.1, 2.2, -0.2], p2: [-2.0, 7.4, 0.1], col: [54, 138, 46], delay: 0.28 },
+  // 7, 8, 9: Pink Tulips
+  { p0: [-0.3, -2.9, 0.1], p1: [-3.5, 0.3, 0.3], p2: [-6.4, 3.4, 0.6], col: [68, 152, 56], delay: 0.18 },
+  { p0: [0.3, -2.9, -0.1], p1: [2.3, 2.7, -0.2], p2: [3.8, 7.7, 0.0], col: [68, 152, 56], delay: 0.35 },
+  { p0: [0.4, -2.9, 0.2], p1: [3.4, -0.8, 0.5], p2: [6.1, 0.6, 0.8], col: [68, 152, 56], delay: 0.08 },
+];
+
+let frameCount = 0;
+let lastFpsTime = performance.now();
+
+function render(now) {
+  requestAnimationFrame(render);
+
+  rotY += (targetRotY - rotY) * 0.1;
+  rotX += (targetRotX - rotX) * 0.1;
+  zoom += (targetZoom - zoom) * 0.1;
+  windGust *= 0.96;
+
+  cosRX = Math.cos(rotX); sinRX = Math.sin(rotX);
+  cosRY = Math.cos(rotY); sinRY = Math.sin(rotY);
+  fov = Math.min(cols * cellW, rows * cellH) * 1.15 * zoom;
+
+  const elapsed = (now - startTime) * 0.001;
+  const sway = Math.sin(now * 0.0014) * 0.20 + Math.sin(now * 0.0029) * 0.07 + Math.sin(now * 0.012) * windGust * 1.1;
+
+  // Timeline:
+  // 0.0s -> 1.0s : Vase & patterned ribbon materialize
+  // 0.3s -> 1.8s : Stems shoot up with flower buds riding on their tips!
+  // 0.8s -> 2.2s : Leaves & goldenrod Solidago unfurl
+  // 1.5s -> 3.8s : All 4 flower species bloom open in a lush staggered wave!
+  const vaseProg = easeOutCubic(elapsed / 1.0);
+  const leafProg = easeOutCubic((elapsed - 0.8) / 1.4);
+
+  zBuffer.fill(0);
+  charBuffer.fill(0);
+
+  drawVaseAndRibbon(vaseProg, sway);
+
+  // Compute current tip position & individual bloom progress for each of the 10 flowers
+  const tips = [];
+  const blooms = [];
+  for (let i = 0; i < STEMS_DATA.length; i++) {
+    const st = STEMS_DATA[i];
+    const sProg = easeOutCubic((elapsed - 0.3 - st.delay * 0.5) / 1.4);
+    drawStem(st.p0, st.p1, st.p2, 0.11, sProg, st.col[0], st.col[1], st.col[2], sway);
+    tips.push(evalBezier(st.p0, st.p1, st.p2, sProg));
+    // Bud starts appearing once stem reaches 55%, then blooms fully over 2.0 seconds
+    const bProg = Math.max(0, Math.min(1, (elapsed - 1.15 - st.delay) / 2.1));
+    blooms.push(sProg > 0.5 ? bProg : 0);
+  }
+
+  // Foliage & Solidago fillers
+  drawLeaf([-0.4, -1.8, 0.6], [-0.90, -0.15, 0.45], 4.2, 1.15, leafProg, 32, 125, 38, sway);
+  drawLeaf([0.4, -1.9, 0.6], [0.90, -0.20, 0.45], 4.3, 1.15, leafProg, 36, 135, 42, sway);
+  drawLeaf([0.0, -2.3, 0.95], [0.05, -0.45, 0.88], 3.6, 1.10, leafProg, 40, 145, 45, sway);
+  drawLeaf([-0.6, -0.2, 0.1], [-0.92, 0.28, 0.2], 4.0, 0.95, leafProg, 28, 115, 36, sway);
+  drawLeaf([0.6, -0.3, 0.0], [0.92, 0.22, 0.15], 3.9, 0.95, leafProg, 28, 115, 36, sway);
+
+  drawLeaf([-0.7, -2.0, 0.2], [-0.96, -0.12, 0.15], 7.6, 0.34, leafProg, 55, 142, 58, sway);
+  drawLeaf([-0.5, -2.3, 0.3], [-0.84, -0.52, 0.25], 7.8, 0.22, leafProg, 62, 150, 64, sway);
+  drawLeaf([0.7, -1.9, 0.1], [0.95, -0.15, 0.15], 7.2, 0.32, leafProg, 55, 140, 56, sway);
+  drawLeaf([0.6, -1.5, -0.1], [0.92, 0.18, -0.1], 6.4, 0.24, leafProg, 62, 148, 62, sway);
+
+  drawSolidago([-0.5, 0.3, -0.4], [-0.32, 0.94, -0.15], 5.6, leafProg, sway);
+  drawSolidago([0.5, 0.2, -0.4], [0.38, 0.91, -0.15], 5.4, leafProg, sway);
+  drawSolidago([-1.5, 0.1, -0.2], [-0.52, 0.85, 0.0], 4.8, leafProg, sway);
+  drawSolidago([1.5, 0.0, -0.2], [0.52, 0.84, 0.0], 4.7, leafProg, sway);
+
+  // 1. Gerbera Daisies
+  drawGerbera([tips[0][0], tips[0][1] + 0.05, tips[0][2] + 0.20], 0.18, -0.06, 2.25, blooms[0], PALETTE_PINK, sway);
+  drawGerbera([tips[1][0], tips[1][1] + 0.05, tips[1][2] + 0.20], 0.12, 0.26, 2.20, blooms[1], PALETTE_ORANGE, sway);
+  drawGerbera([tips[2][0], tips[2][1] + 0.05, tips[2][2] + 0.20], 0.05, 0.02, 2.25, blooms[2], PALETTE_YELLOW, sway);
+
+  // 2. Peony Roses
+  drawPeony([tips[3][0], tips[3][1] + 0.05, tips[3][2] + 0.20], 0.16, -0.24, 2.25, false, blooms[3], sway);
+  drawPeony([tips[4][0], tips[4][1] + 0.05, tips[4][2] + 0.20], 0.22, -0.32, 1.50, true, blooms[4], sway);
+
+  // 3. Stargazer Lilies
+  drawLily([tips[5][0], tips[5][1] + 0.05, tips[5][2] + 0.25], 0.12, 0.24, 0.15, 2.30, blooms[5], sway);
+  drawLily([tips[6][0], tips[6][1] + 0.05, tips[6][2] + 0.25], 0.22, 0.10, -0.20, 2.10, blooms[6], sway);
+
+  // 4. Pink Tulips
+  drawTulip([tips[7][0], tips[7][1], tips[7][2] + 0.15], -1.42, 0.0, 0.26, 1.42, blooms[7], sway);
+  drawTulip([tips[8][0], tips[8][1], tips[8][2] + 0.15], -1.44, 0.0, -0.18, 1.42, blooms[8], sway);
+  drawTulip([tips[9][0], tips[9][1], tips[9][2] + 0.15], -1.40, 0.0, -0.28, 1.38, blooms[9], sway);
+
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, width, height);
+  ctx.font = 'bold 7px Consolas, "Courier New", monospace';
+  ctx.textBaseline = 'top';
+
+  if (elapsed > 1.4) {
+    const starAlpha = Math.min(0.75, (elapsed - 1.4) * 0.5);
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+      const twinkle = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(now * 0.001 * s.speed + s.phase));
+      const sx = Math.floor(s.x * cols);
+      const sy = Math.floor(s.y * rows);
+      const idx = sy * cols + sx;
+      if (idx >= 0 && idx < charBuffer.length && charBuffer[idx] === 0) {
+        const bVal = Math.floor(180 * twinkle * starAlpha);
+        ctx.fillStyle = `rgb(${bVal},${bVal},${bVal + 20})`;
+        ctx.fillText(s.char, sx * cellW, sy * cellH);
+      }
+    }
+  }
+
+  for (let r = 0; r < rows; r++) {
+    const rowOffset = r * cols;
+    const py = r * cellH;
+    for (let c = 0; c < cols; c++) {
+      const idx = rowOffset + c;
+      const chIdx = charBuffer[idx];
+      if (chIdx > 0) {
+        ctx.fillStyle = colorBuffer[idx];
+        ctx.fillText(chars[chIdx - 1], c * cellW, py);
+      }
+    }
+  }
+
+  frameCount++;
+  if (now - lastFpsTime >= 500) {
+    const fps = Math.round((frameCount * 1000) / (now - lastFpsTime));
+    document.getElementById('fps-counter').textContent = `Ln 128, Col 24 | Spaces: 2 | UTF-8 | ${fps} FPS`;
+    frameCount = 0;
+    lastFpsTime = now;
+  }
+}
+
+requestAnimationFrame(render);
+</script>
+</body>
+</html>'''
+
+with open("luxury_bouquet_bloom.html", "w", encoding="utf-8") as f:
+    f.write(html_4species)
+
+print("HTML saved successfully")

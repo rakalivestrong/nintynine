@@ -11,24 +11,29 @@ const FPS = 30;
 
 const PALETTES = [
   {
-    name: 'Pink Lilies',
-    petal: '#f39ab2', edge: '#f9c3d2', blush: '#d99aa6', throat: '#c9dc78', vein: 'rgba(170,40,80,0.45)',
-    anther: '#4a1d10', spots: true,
+    name: 'Gerbera & Peony Garden',
+    petal: ['#ff4fa3', '#ff8533', '#ffd21f', '#f43f5e', '#fb7185', '#fb923c'],
+    edge: null,
+    blush: '#e11d48',
+    throat: '#2b1108',
+    vein: 'rgba(120,20,40,0.5)',
+    anther: '#3a160a',
+    spots: false,
   },
   {
-    name: 'White Lilies',
-    petal: '#f6f2ea', edge: '#ffffff', blush: '#d8dcc0', throat: '#c8d87a', vein: 'rgba(120,130,90,0.4)',
-    anther: '#8a3a16', spots: false,
+    name: 'Pink Gerberas',
+    petal: '#ff3b94', edge: '#ffb3d9', blush: '#e11d48', throat: '#1f0d05', vein: 'rgba(140,20,60,0.5)',
+    anther: '#3a160a', spots: false,
   },
   {
-    name: 'Mixed Garden',
-    petal: ['#e3233a', '#d24aa9', '#f08a2a', '#e9c63c', '#f1e4c6', '#f39ab2'], edge: null,
-    blush: '#c98a7a', throat: '#e8d070', vein: 'rgba(80,10,20,0.45)', anther: '#3a160a', spots: true,
+    name: 'Sunset Orange & Gold',
+    petal: ['#ff6b00', '#ff9f1c', '#ffbf00', '#f77f00', '#fcbf49'], edge: '#ffe8a3',
+    blush: '#d64000', throat: '#260f03', vein: 'rgba(150,50,0,0.45)', anther: '#3a160a', spots: false,
   },
   {
-    name: 'Twilight Blue',
-    petal: ['#3b82f6', '#60a5fa', '#93c5fd', '#2563eb', '#1d4ed8'], edge: '#dbeafe',
-    blush: '#1e3a8a', throat: '#38bdf8', vein: 'rgba(30,58,138,0.5)', anther: '#f59e0b', spots: true,
+    name: 'Twilight Garden',
+    petal: ['#3b82f6', '#8b5cf6', '#ec4899', '#6366f1', '#a855f7'], edge: '#fbcfe8',
+    blush: '#4c1d95', throat: '#170c2e', vein: 'rgba(40,20,100,0.5)', anther: '#f59e0b', spots: false,
   }
 ];
 
@@ -455,48 +460,114 @@ export class BouquetExperience {
     const [x, y] = this.sway(base[0], base[1]);
     const multi = Array.isArray(pal.petal);
     const petal = multi ? pal.petal[b.colorIdx % pal.petal.length] : pal.petal;
-    const edge = pal.edge || mix(petal, '#ffffff', 0.25);
+    const edge = pal.edge || mix(petal, '#ffffff', 0.28);
 
-    const budCol = mix('#9cc63e', pal.blush, blush);
+    const budCol = mix('#7ca830', pal.blush, blush);
     const color = mix(budCol, petal, smooth(0.05, 0.45, open));
-    const edgeCol = mix(mix('#b4d860', pal.blush, blush), edge, smooth(0.05, 0.45, open));
-    const throat = mix('#8fbf3a', pal.throat, open);
+    const edgeCol = mix(mix('#9bc840', pal.blush, blush), edge, smooth(0.05, 0.45, open));
 
-    const L = b.len * (0.3 + 0.7 * grow) * (1 + 0.3 * open);
-    const W = b.width * (0.6 + 0.4 * grow) * (1 + 1.4 * open);
+    const radius = b.len * 0.9 * (0.35 + 0.65 * grow);
 
     g.save();
     g.translate(x, y);
     g.rotate(b.dir + b.droop * open);
     g.scale(1, lerp(1, b.squash, open));
-    g.fillStyle = '#5f9a34';
-    g.beginPath(); g.ellipse(0, 0, 9, 7, 0, 0, Math.PI * 2); g.fill();
-    g.rotate(b.twist * open);
-    for (const k of [3, 1, -1, 2, -2, 0]) {
-      g.save();
-      g.rotate(rad(k * 60) * open);
-      const wob = 1 + (b.rnd[(k + 3) % 12] - 0.5) * 0.12 * open;
-      this.tepal(g, L * wob, W, color, edgeCol, throat, pal.vein, open, k === 0 ? 0.3 : Math.sign(k) || 1, pal.spots, b.rnd);
-      g.restore();
-    }
-    const st = smooth(0.55, 1, open);
-    if (st > 0) {
-      for (let i = 0; i < 6; i++) {
-        const a = rad(-28 + i * 11);
-        const l = L * 0.72 * st * (0.92 + b.rnd[i] * 0.16);
-        g.strokeStyle = '#d6dca8';
-        g.lineWidth = 3;
-        g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(l * 0.5, a * l * 0.3, Math.cos(a) * l, Math.sin(a) * l); g.stroke();
-        g.fillStyle = pal.anther;
-        g.beginPath(); g.ellipse(Math.cos(a) * l, Math.sin(a) * l, 11, 4.5, a + Math.PI / 2, 0, Math.PI * 2); g.fill();
+
+    // Receptacle / calyx base
+    g.fillStyle = '#4d8028';
+    g.beginPath();
+    g.arc(0, 0, radius * 0.22, 0, Math.PI * 2);
+    g.fill();
+
+    // 1. Ray florets / petals arranged in dense concentric Gerbera rings
+    const layers = [
+      { count: 28, lenMult: 1.05, wMult: 0.22, rotOffset: 0, shade: 0.88, curl: 0.18 },
+      { count: 24, lenMult: 0.88, wMult: 0.20, rotOffset: 0.12, shade: 0.98, curl: 0.08 },
+      { count: 20, lenMult: 0.68, wMult: 0.18, rotOffset: 0.25, shade: 1.08, curl: -0.05 }
+    ];
+
+    for (let lIdx = 0; lIdx < layers.length; lIdx++) {
+      const layer = layers[lIdx];
+      const layerOpen = easeOut(clamp((open - (layers.length - 1 - lIdx) * 0.08) / 0.84, 0, 1));
+      const pLen = radius * layer.lenMult * (0.35 + 0.65 * layerOpen);
+      const pW = radius * layer.wMult * (0.4 + 0.6 * layerOpen);
+
+      for (let p = 0; p < layer.count; p++) {
+        const ang = (p / layer.count) * Math.PI * 2 + layer.rotOffset + b.twist;
+        g.save();
+        g.rotate(ang);
+
+        const tipX = pLen;
+        const tipY = layer.curl * pW * (1 - layerOpen);
+        const w = pW * (0.5 + 0.5 * layerOpen);
+
+        g.beginPath();
+        g.moveTo(radius * 0.14, 0);
+        g.bezierCurveTo(pLen * 0.35, -w, pLen * 0.8, -w * 0.85 + tipY * 0.3, tipX, tipY);
+        g.bezierCurveTo(pLen * 0.8, w * 0.85 + tipY * 0.3, pLen * 0.35, w, radius * 0.14, 0);
+
+        const grad = g.createLinearGradient(0, 0, pLen, 0);
+        grad.addColorStop(0, mix(color, '#ffdd77', 0.25));
+        grad.addColorStop(0.3, color);
+        grad.addColorStop(1, edgeCol);
+        g.fillStyle = grad;
+        g.fill();
+
+        g.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+        g.lineWidth = 2.5;
+        g.stroke();
+
+        // Delicate central petal vein
+        if (layerOpen > 0.3) {
+          g.strokeStyle = pal.vein;
+          g.lineWidth = 1.8;
+          g.beginPath();
+          g.moveTo(radius * 0.18, 0);
+          g.lineTo(pLen * 0.88, tipY * 0.5);
+          g.stroke();
+        }
+
+        g.restore();
       }
-      const pl = L * 0.82 * st;
-      g.strokeStyle = '#cfe0a0';
-      g.lineWidth = 4;
-      g.beginPath(); g.moveTo(0, 0); g.lineTo(pl, 0); g.stroke();
-      g.fillStyle = '#86a83c';
-      g.beginPath(); g.arc(pl, 0, 7, 0, Math.PI * 2); g.fill();
     }
+
+    // 2. Sculpted central disc floret (signature Gerbera dark eye + golden stipple ring)
+    const discR = radius * 0.26 * (0.35 + 0.65 * open);
+    if (discR > 1) {
+      // Golden outer floret ring
+      const ringGrad = g.createRadialGradient(0, 0, discR * 0.55, 0, 0, discR);
+      ringGrad.addColorStop(0, '#f59e0b');
+      ringGrad.addColorStop(0.8, '#fbbf24');
+      ringGrad.addColorStop(1, '#b45309');
+      g.fillStyle = ringGrad;
+      g.beginPath();
+      g.arc(0, 0, discR, 0, Math.PI * 2);
+      g.fill();
+
+      // Deep dark velvety center eye
+      const eyeGrad = g.createRadialGradient(0, 0, 0, 0, 0, discR * 0.65);
+      eyeGrad.addColorStop(0, '#150a06');
+      eyeGrad.addColorStop(0.7, '#2a1209');
+      eyeGrad.addColorStop(1, '#451a0a');
+      g.fillStyle = eyeGrad;
+      g.beginPath();
+      g.arc(0, 0, discR * 0.65, 0, Math.PI * 2);
+      g.fill();
+
+      // Seed / disc stipple pattern
+      if (open > 0.4) {
+        g.fillStyle = 'rgba(254, 240, 138, 0.75)';
+        const stippleCount = 18;
+        for (let s = 0; s < stippleCount; s++) {
+          const sAng = (s / stippleCount) * Math.PI * 2 + s * 0.35;
+          const sRad = discR * (0.62 + 0.28 * ((s * 5) % 7) / 7);
+          g.beginPath();
+          g.arc(Math.cos(sAng) * sRad, Math.sin(sAng) * sRad, 1.4, 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+    }
+
     g.restore();
   }
 
